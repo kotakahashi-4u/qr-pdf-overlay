@@ -741,10 +741,15 @@
     <script>
         function initMainApp() {
             if (window.pdfjsLib) {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = window.PDF_WORKER_URL;
+                // file:// 環境ではWeb Workerのローカル読み込みがセキュリティ制約で遮断されるため、メインスレッド実行へ切り替え
+                if (window.location.protocol === 'file:') {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+                } else {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = window.PDF_WORKER_URL;
+                }
             }
 
-            let bgPdfBytes = null, csvData = [], csvHeaders = [], currentAppMode = 'overlay', bgPdfCanvas = null;      
+            let bgPdfBytes = null, csvData = [], csvHeaders = [], currentAppMode = 'overlay', bgPdfCanvas = null;     
             let bgPdfPageCount = 0;
             let customFontBytes = null;
 
