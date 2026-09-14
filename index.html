@@ -38,6 +38,9 @@
                             localScript.src = localUrl;
                             localScript.onload = () => {
                                 console.log(`[ローカル成功] ロード完了: ${localUrl}`);
+                                if (localUrl.includes('pdf.min.js')) {
+                                    window.PDF_WORKER_URL = './lib/pdf.worker.min.js';
+                                }
                                 resolve();
                             };
                             localScript.onerror = () => {
@@ -66,25 +69,33 @@
             // PDF Worker URL の初期設定
             window.PDF_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+            let isPdfJsLocal = false;
+
             // 各スクリプトのCDNとローカルパスのペア
             const libraryPairs = [
                 { cdn: 'https://cdn.tailwindcss.com', local: './lib/tailwindcss.js' },
                 { cdn: 'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js', local: './lib/papaparse.min.js' },
                 { cdn: 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js', local: './lib/qrious.min.js' },
                 { cdn: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', local: './lib/jszip.min.js' },
-                { cdn: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', local: './lib/pdf.min.js' },
+                { 
+                    cdn: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 
+                    local: './lib/pdf.min.js',
+                    onFallback: () => { isPdfJsLocal = true; } // CDN失敗・ローカル読み込み時にフラグを立てる
+                },
                 { cdn: 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js', local: './lib/pdf-lib.min.js' },
                 { cdn: 'https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js', local: './lib/fflate.min.js' },
                 { cdn: 'https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js', local: './lib/fontkit.umd.min.js' }
             ];
 
             // 並列で各ライブラリをCDNからロード（失敗したものは個別でローカルへフォールバック）
-            await Promise.all(libraryPairs.map(lib => loadScriptWithFallback(lib.cdn, lib.local)));
-
-            // pdf.js がローカル読み込みだった場合はワーカーもローカルへ切り替え
-            if (!window.pdfjsLib && window.location.protocol === 'file:') {
-                window.PDF_WORKER_URL = './lib/pdf.worker.min.js';
-            }
+            await Promise.all(libraryPairs.map(lib => loadScriptWithFallback(lib.cdn, lib.local).then(() => {
+                if (lib.onFallback && !window.pdfjsLibFromCDN) {
+                    // pdf.js がCDNから取得できなかった場合はワーカーURLもローカルに同期
+                    if (isPdfJsLocal) {
+                        window.PDF_WORKER_URL = './lib/pdf.worker.min.js';
+                    }
+                }
+            })));
 
             // 全ライブラリの読み込み完了を通知
             window.isLibrariesLoaded = true;
