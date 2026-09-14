@@ -10,8 +10,8 @@
 [こちらからツールにアクセス](https://kotakahashi-4u.github.io/qr-pdf-overlay/)
 
 ### オフライン利用
-1. 以下手順に従い、Zipファイルをダウンロードする。  
+1. オンライン環境にて以下手順に従い、Zipファイルをダウンロードする。  
   <img width="960" height="540" alt="Image" src="https://github.com/user-attachments/assets/9fdb3c50-e2c3-4625-8e29-36b782e86baa" />
 
-2. ダウンロードしたZipファイルを解凍する。  
+2. ダウンロードしたZipファイルをオフライン環境にUSB等を用いて移動し、解凍する。  
 3. 解凍してできたディレクトリ内にindex.htmlがあるため、それをGoogle ChromeやEdge等のブラウザアプリで開く。
