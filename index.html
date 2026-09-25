@@ -2647,21 +2647,52 @@
                                 xobjStream.dict = xobjDict;
                                 const xobjRef = pdfDoc.context.register(xobjStream);
 
-                                const oldResources = page.node.Resources();
-                                const newResources = pdfDoc.context.obj({});
-                                if (oldResources) {
-                                    const entries = oldResources.entries();
-                                    for (let k = 0; k < entries.length; k++) {
-                                        const [key, val] = entries[k];
-                                        if (key.asString() !== '/XObject') newResources.set(key, val);
-                                    }
+                                // 既存のResourcesおよびXObject辞書を破棄せず保持・マージ（バーコード等の既存画像を保護）
+                                let resources = page.node.Resources();
+                                if (!resources) {
+                                    resources = pdfDoc.context.obj({});
+                                    page.node.set(PDFName.of('Resources'), resources);
                                 }
-                                const newXObjDict = pdfDoc.context.obj({});
-                                newXObjDict.set(PDFName.of('QR'), xobjRef);
-                                newResources.set(PDFName.of('XObject'), newXObjDict);
-                                page.node.set(PDFName.of('Resources'), newResources);
+                                let xobjGroup = resources.get(PDFName.of('XObject'));
+                                if (xobjGroup && typeof xobjGroup.lookup === 'function') {
+                                    xobjGroup = pdfDoc.context.lookup(xobjGroup);
+                                }
+                                if (!xobjGroup || !(xobjGroup instanceof PDFLib.PDFDict)) {
+                                    xobjGroup = pdfDoc.context.obj({});
+                                    resources.set(PDFName.of('XObject'), xobjGroup);
+                                }
+                                const stampName = `QR_Stamp_${globalIndex}`;
+                                xobjGroup.set(PDFName.of(stampName), xobjRef);
 
-                                const invokeOps = `q 1 0 0 1 ${r2(ptX)} ${r2(ptY)} cm /QR Do Q\n`;
+                                // ページの回転属性 (/Rotate) に応じた正立・配置変換行列の計算
+                                const rot = page.getRotation().angle % 360;
+                                const rawW = page.getWidth();
+                                const rawH = page.getHeight();
+                                let a = 1, b = 0, c = 0, d = 1, e = ptX, f = ptY;
+
+                                if (rot === 90) {
+                                    // 時計回り90度回転ページ：画面上の正立配置へ幾何補正
+                                    a = 0; b = 1; c = -1; d = 0;
+                                    e = (yPos * mm2pt) + ptSize;
+                                    f = ptX;
+                                } else if (rot === 180) {
+                                    // 180度回転ページ
+                                    a = -1; b = 0; c = 0; d = -1;
+                                    e = rawW - ptX;
+                                    f = (yPos * mm2pt) + ptSize;
+                                } else if (rot === 270) {
+                                    // 反時計回り90度回転ページ
+                                    a = 0; b = -1; c = 1; d = 0;
+                                    e = rawW - (yPos * mm2pt) - ptSize;
+                                    f = rawH - ptX;
+                                } else {
+                                    // 0度（通常）
+                                    a = 1; b = 0; c = 0; d = 1;
+                                    e = ptX;
+                                    f = rawH - (yPos * mm2pt) - ptSize;
+                                }
+
+                                const invokeOps = `q ${r2(a)} ${r2(b)} ${r2(c)} ${r2(d)} ${r2(e)} ${r2(f)} cm /${stampName} Do Q\n`;
                                 const invokeBytes = new TextEncoder().encode(invokeOps);
                                 const invokeStream = pdfDoc.context.stream(invokeBytes);
                                 invokeStream.dict.set(PDFName.of('Length'), PDFNumber.of(invokeBytes.byteLength));
